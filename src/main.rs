@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use clap::Clap;
+use clap::{Args, Parser, Subcommand};
 use log::*;
 use nettest::*;
 use std::time::Duration;
@@ -22,7 +22,8 @@ impl Log for Logger {
     fn flush(&self) {}
 }
 
-#[derive(Clap)]
+#[derive(Parser, Debug)]
+#[clap(name = "nettest")]
 #[clap(about = "All-in-one network test tool")]
 struct Opt {
     #[clap(subcommand)]
@@ -42,7 +43,7 @@ struct Opt {
     size: usize,
 }
 
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 pub enum Command {
     /// Measuring latency using ICMP or ICMPv6 echo"
     /// example: `nettest ping 127.0.0.1` or `nettest ping google.com`

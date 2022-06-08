@@ -38,7 +38,7 @@ impl Task for TcpuploadTask {
         let mut rand_pool = Vec::with_capacity(2 * MB);
         let mut rng = Xoshiro256Plus::from_entropy();
         for _ in 0..2 * MB {
-            rand_pool.push(rng.gen_range(0x20, 0x7F));
+            rand_pool.push(rng.gen_range(0x20..0x7F));
         }
         let size = self.size * MB;
         let ulstring = format!("UPLOAD {} 0\r\n", size);
@@ -50,7 +50,7 @@ impl Task for TcpuploadTask {
         let mut old_size = rand_size;
         let step = (size / 32).max(MB);
         while rand_size > 0 {
-            let start = rng.gen_range(0, MB);
+            let start = rng.gen_range(0..MB);
             let len = rand_size.min(MB);
             stream.write_all(&rand_pool[start..start + len])?;
             rand_size -= len;

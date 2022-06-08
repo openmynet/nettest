@@ -5,6 +5,7 @@ use log::info;
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256Plus;
 use std::net::{self, SocketAddr, ToSocketAddrs, UdpSocket};
+use std::pin::Pin;
 use std::time::{Duration, Instant};
 
 const MAX_DATAGRAM_SIZE: usize = 1350;
@@ -13,7 +14,8 @@ const DOWNLOAD_ID: u64 = 3;
 pub struct QuicdownloadTask {
     addr: SocketAddr,
     socket: UdpSocket,
-    conn: Box<quiche::Connection>,
+    // conn: Box<quiche::Connection>,
+    conn: Pin<Box<quiche::Connection>>,
     size: usize,
 }
 
@@ -49,9 +51,11 @@ impl QuicdownloadTask {
         config.set_application_protos(b"\x13speedtest/0.1")?;
         config.set_disable_active_migration(true);
         config.set_max_idle_timeout(timeout.as_millis() as u64);
-        let mut scid = vec![0u8; quiche::MAX_CONN_ID_LEN];
+        let mut scid = vec![0u8; quiche::MAX_CONN_ID_LEN];        
         Xoshiro256Plus::from_entropy().fill(scid.as_mut_slice());
-        let mut conn = std::pin::Pin::into_inner(quiche::connect(None, &scid, &mut config)?);
+        let scid = quiche::ConnectionId::from_ref(&scid);
+        let mut conn = quiche::connect(None, &scid, peer_addr, &mut config)?;
+        // let mut conn = std::pin::Pin::into_inner(pqc);
         let mut out = vec![0; MAX_DATAGRAM_SIZE];
         loop {
             let write = match conn.send(&mut out) {
@@ -60,14 +64,15 @@ impl QuicdownloadTask {
                 Err(e) => Err(e).context("QUIC handshake failed")?,
             };
             socket
-                .send(&out[..write])
+                .send(&out)
                 .context("Failed to establish QUIC handshake")?;
         }
         let mut init_buf = [0u8; 1024];
         loop {
-            let len = socket.recv(&mut init_buf)?;
+            let (len,from) = socket.recv_from(&mut init_buf)?;
+            let recv_info = quiche::RecvInfo { from };
             // Process potentially coalesced packets.
-            match conn.recv(&mut init_buf[..len]) {
+            match conn.recv(&mut init_buf, recv_info) {
                 Ok(v) => v,
                 Err(quiche::Error::Done) => break,
                 Err(e) => Err(e).context("Fail to receive from peer")?,
@@ -76,6 +81,8 @@ impl QuicdownloadTask {
         if conn.is_closed() {
             return Err(anyhow!("connection closed, {:?}", conn.stats()));
         }
+        // let conn = std::pin::Pin::new(&conn);
+        let conn = Box::pin(conn);
         Ok(Self {
             addr: peer_addr,
             conn,
@@ -127,7 +134,7 @@ impl Task for QuicdownloadTask {
                 Err(quiche::Error::Done) => break,
                 Err(e) => Err(e).context("Failed to close connection")?,
             };
-            self.socket.send(&out[..write])?;
+            self.socket.send(&out)?;
         }
         if self.conn.is_closed() {
             let time = now.elapsed();

@@ -6,7 +6,7 @@ use rand_xoshiro::Xoshiro256Plus;
 use socket2::{Domain, Protocol, Socket, Type};
 use std::convert::{TryFrom, TryInto};
 use std::io::ErrorKind;
-use std::mem::size_of;
+use std::mem::{size_of, MaybeUninit};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -170,16 +170,22 @@ impl Task for PingTask {
                 size
             ));
         }
+
+        
+
+        let buf_maybe = unsafe { &mut *(&mut buffer[..] as *mut [u8] as *mut [MaybeUninit<u8>]) };
+
         let (size, addr) = self
             .socket
-            .recv_from(&mut buffer)
+            .recv_from(buf_maybe)
             .map_err(|e| match e.kind() {
                 ErrorKind::WouldBlock | ErrorKind::TimedOut => anyhow!("Timed out"),
                 _ => anyhow!("Failed to receive echo reply: {:?}", e),
             })?;
         let time = send_time.elapsed();
         let recv_hdr: Icmphdr = buffer.as_slice().try_into().context("Packet is broken")?;
-        let ip = addr.as_std().unwrap().ip();
+        
+        let ip = addr.as_socket().unwrap().ip();
         if ip.is_ipv4() && recv_hdr.icmp_type != IcmpType::EchoReply
             || ip.is_ipv6() && recv_hdr.icmp_type != IcmpType::EchoReplyV6
         {

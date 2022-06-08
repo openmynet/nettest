@@ -1,28 +1,21 @@
 [package]
-name = 'nettest'
-version = '0.2.0'
-authors = ['12101111 <w12101111@gmail.com>']
-edition = '2018'
+name = "nettest"
+version = "0.2.1"
+authors = ["openmynet <openmynet@gmail.com>"]
+edition = "2018"
 
 [dependencies]
-rand_xoshiro = '0.4'
-log = '0.4'
-anyhow = '1'
-clap = "3.0.0-beta.1"
-quiche = '0.4'
+rand_xoshiro = "0.6.0"
+log = "0.4"
+anyhow = "1"
+clap = { version = "3.1.18", features = ["derive"] }
+quiche = { version = "0.14" }
+socket2 = "0.4.4"
 
 [dependencies.rand]
-version = '0.7'
+version = "0.8.5"
 default-features = false
-features = ['getrandom']
-
-[dependencies.socket2]
-git = 'https://github.com/alexcrichton/socket2-rs.git'
-[patch.crates-io.rand]
-git = 'https://github.com/rust-random/rand.git'
-
-[patch.crates-io.rand_core]
-git = 'https://github.com/rust-random/rand.git'
+features = ["getrandom"]
 
 [workspace]
 members = [".", "server"]
